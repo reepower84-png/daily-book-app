@@ -1,0 +1,14 @@
+{
+  "name": "데일리북",
+  "short_name": "데일리북",
+  "description": "오늘치 데일리북을 보낼지 결정하는 버튼",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3ede2",
+  "theme_color": "#7a4f34",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
