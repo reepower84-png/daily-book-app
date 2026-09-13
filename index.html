@@ -278,6 +278,14 @@ function 알리기(msg, kind = '') {
 }
 
 // ── 발송 ────────────────────────────────────────────────
+/** 그 시각 이후에 생긴 실행 하나. 아직 없거나 GitHub이 응답하지 않으면 null. */
+async function 실행찾기(시각) {
+  try {
+    const { workflow_runs: runs } = await (await gh(`/actions/workflows/${WORKFLOW}/runs?per_page=5`)).json();
+    return runs.find(r => new Date(r.created_at).getTime() >= 시각 - 20000) ?? null;
+  } catch { return null; }
+}
+
 async function 보내기() {
   const go = $('#go');
   const 이전 = 예고.sends;
@@ -285,16 +293,27 @@ async function 보내기() {
   go.textContent = '보내는 중…';
   알리기(`${분야()} ${예고.pages}쪽을 요청했습니다<span class="dots"></span>`);
 
+  const 멈춤 = 메시지 => { go.disabled = false; go.textContent = '다시 보내기'; 알리기(메시지, 'bad'); };
+
+  // 발송 요청은 한 번만 들어가야 한다 — 두 번 들어가면 메일도 두 통 나가고 진도도 두 번 오른다.
+  // 그런데 GitHub 은 일을 접수해 놓고 응답만 잃는 경우가 있다 (5xx). 그래서 실패했다고
+  // 곧바로 다시 던지지 않고, 실행이 이미 생겼는지 확인한 뒤 없을 때만 다시 던진다.
   const 시각 = Date.now();
-  try {
-    await gh(`/actions/workflows/${WORKFLOW}/dispatches`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ref: REF, inputs: { category: 고른분야 } }),
-    });
-  } catch (e) {
-    go.disabled = false; go.textContent = '다시 보내기';
-    return 알리기(esc(e.message), 'bad');
+  for (let 시도 = 1; ; 시도++) {
+    try {
+      await gh(`/actions/workflows/${WORKFLOW}/dispatches`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ ref: REF, inputs: { category: 고른분야 } }),
+      });
+      break;                                           // 접수됨
+    } catch (e) {
+      if (e.토큰문제) return 멈춤(esc(e.message));      // 권한 문제는 다시 해도 같다
+      알리기('GitHub이 응답하지 않습니다. 확인하는 중<span class="dots"></span>');
+      await sleep(4000);
+      if (await 실행찾기(시각)) break;                  // 응답만 잃었을 뿐 접수는 됐다
+      if (시도 >= 3) return 멈춤(`${esc(e.message)}<br>GitHub 쪽이 불안정합니다. 잠시 뒤 다시 눌러 주세요.`);
+    }
   }
   await 지켜보기(시각, go, 이전);
 }
@@ -303,11 +322,7 @@ async function 보내기() {
 async function 지켜보기(시각, go, 이전) {
   for (let i = 0; i < 75; i++) {                       // 4초 × 75 ≈ 5분
     await sleep(4000);
-    let runs;
-    try {
-      ({ workflow_runs: runs } = await (await gh(`/actions/workflows/${WORKFLOW}/runs?per_page=5`)).json());
-    } catch { continue; }                              // 일시적 실패는 그냥 다음 차례에
-    const run = runs.find(r => new Date(r.created_at).getTime() >= 시각 - 20000);
+    const run = await 실행찾기(시각);
     if (!run) { 알리기('실행을 기다리는 중<span class="dots"></span>'); continue; }
     if (run.status !== 'completed') {
       알리기(run.status === 'queued' ? '차례를 기다리는 중<span class="dots"></span>' : '본문을 모으는 중<span class="dots"></span>');
