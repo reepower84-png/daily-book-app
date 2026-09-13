@@ -132,12 +132,19 @@ const 며칠전 = ymd => Math.round((new Date(오늘()) - new Date(ymd)) / 86400
 // 설정 링크(#t=토큰)로 들어오면 그 자리에서 저장하고 주소를 지운다.
 // 폰에서 긴 토큰을 손으로 옮겨 적지 않게 하려는 장치다.
 // 해시는 서버로 전송되지 않으므로 Pages 로그에는 남지 않는다.
-(function 설정링크() {
+function 설정링크() {
   const m = location.hash.match(/[#&]t=([^&]+)/);
-  if (!m) return;
+  if (!m) return false;
   try { localStorage.setItem(KEY, decodeURIComponent(m[1])); } catch {}
   history.replaceState(null, '', location.pathname + location.search);
-})();
+  return true;
+}
+설정링크();
+
+// 이 페이지를 이미 열어 둔 탭에서 설정 링크를 다시 열면 주소의 '#뒤'만 바뀐다.
+// 브라우저는 그걸 같은 문서로 보고 새로고침을 하지 않아서, 위 함수가 다시 돌지 않는다 —
+// 토큰을 넣었는데도 토큰 화면이 그대로 떠 있는 것처럼 보인다. 그래서 직접 듣는다.
+addEventListener('hashchange', () => { if (설정링크()) location.reload(); });
 
 let token = localStorage.getItem(KEY) || '';
 let 예고 = null;          // data/next.json — 앱이 읽는 유일한 파일
