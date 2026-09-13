@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>데일리북</title>
-<meta name="description" content="오늘치 데일리북을 보낼지 결정하는 버튼">
+<meta name="description" content="데일리북 2쪽을 지금 보낼지 결정하는 버튼">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f3ede2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
@@ -17,12 +17,14 @@
 <style>
 :root{
   --bg:#f3ede2; --card:#fffdf8; --ink:#2e2a25; --dim:#877e70; --line:#e2d9c8;
-  --accent:#7a4f34; --accent-ink:#fdf8f0; --ok:#3f6b5a; --bad:#a4432f;
+  --accent:#7a4f34; --ok:#3f6b5a; --bad:#a4432f;
+  --문학:#8a5a3b; --철학:#4a5d7e; --과학:#3f6b5a;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#1a1714; --card:#241f1b; --ink:#eae2d6; --dim:#9b9083; --line:#3a332c;
-    --accent:#c08a61; --accent-ink:#20180f; --ok:#7fb59c; --bad:#e08a74;
+    --accent:#c08a61; --ok:#7fb59c; --bad:#e08a74;
+    --문학:#b5794f; --철학:#6c83aa; --과학:#5c9179;
   }
 }
 *{box-sizing:border-box}
@@ -36,63 +38,57 @@ body{
   padding-top:calc(24px + env(safe-area-inset-top));
   padding-bottom:calc(32px + env(safe-area-inset-bottom));
 }
-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px}
+header{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px}
 .brand{font-size:15px; font-weight:700; letter-spacing:.12em; color:var(--dim)}
-.icon-btn{
-  background:none; border:0; padding:6px; color:var(--dim);
-  font-size:18px; cursor:pointer; line-height:1; border-radius:8px;
-}
+.icon-btn{background:none; border:0; padding:6px; color:var(--dim); font-size:18px;
+  cursor:pointer; line-height:1; border-radius:8px}
 .icon-btn:hover{background:var(--line)}
 
-.card{
-  background:var(--card); border:1px solid var(--line); border-radius:18px;
-  padding:22px; margin-bottom:18px;
+/* 분야 고르기 — 안 고르면 '자동'이 순서대로 돈다 */
+.picker{display:flex; gap:7px; margin-bottom:14px}
+.chip{
+  flex:1; padding:9px 4px; border:1px solid var(--line); border-radius:11px;
+  background:var(--card); color:var(--dim); font:inherit; font-size:13.5px; font-weight:600;
+  cursor:pointer; transition:background .12s, color .12s, border-color .12s;
 }
-.badge{
-  display:inline-block; font-size:12px; font-weight:700; letter-spacing:.08em;
-  padding:4px 10px; border-radius:999px; color:var(--accent-ink); background:var(--accent);
-}
-.badge.문학{background:#8a5a3b} .badge.철학{background:#4a5d7e} .badge.과학{background:#3f6b5a}
-.badge.문학,.badge.철학,.badge.과학{color:#fdf8f0}
+.chip[aria-pressed="true"]{background:var(--sel,var(--accent)); border-color:var(--sel,var(--accent)); color:#fdf8f0}
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:22px; margin-bottom:16px}
+.badge{display:inline-block; font-size:12px; font-weight:700; letter-spacing:.08em;
+  padding:4px 10px; border-radius:999px; color:#fdf8f0}
+.auto{margin-left:7px; font-size:11.5px; color:var(--dim); letter-spacing:.04em}
 .author{margin:14px 0 2px; font-size:13px; color:var(--dim)}
 .title{
-  margin:0; font-size:27px; line-height:1.3; font-weight:600; letter-spacing:-.01em;
-  font-family:"Nanum Myeongjo","Apple SD Gothic Neo",Batang,바탕,serif;
-  word-break:keep-all;
+  margin:0; font-size:26px; line-height:1.3; font-weight:600; letter-spacing:-.01em;
+  font-family:"Nanum Myeongjo","Apple SD Gothic Neo",Batang,바탕,serif; word-break:keep-all;
 }
 .title a{color:inherit; text-decoration:none; border-bottom:1px solid var(--line)}
 .meta{margin:16px 0 0; font-size:14px; color:var(--dim)}
 .meta b{color:var(--ink); font-weight:600}
 .bar{height:4px; border-radius:999px; background:var(--line); margin-top:14px; overflow:hidden}
-.bar>i{display:block; height:100%; background:var(--accent); border-radius:999px}
+.bar>i{display:block; height:100%; border-radius:999px}
 
 button.go{
   display:block; width:100%; padding:21px; border:0; border-radius:16px;
-  background:var(--accent); color:var(--accent-ink);
-  font-size:18px; font-weight:700; letter-spacing:.02em; font-family:inherit;
+  background:var(--accent); color:#fdf8f0;
+  font:inherit; font-size:18px; font-weight:700; letter-spacing:.02em;
   cursor:pointer; transition:transform .08s, opacity .15s;
 }
 button.go:active{transform:scale(.985)}
-button.go:disabled{opacity:.45; cursor:default; transform:none}
-button.go.quiet{background:var(--line); color:var(--dim)}
+button.go:disabled{opacity:.5; cursor:default; transform:none}
 
-.status{margin:16px 2px 0; font-size:14.5px; min-height:22px; color:var(--dim); word-break:keep-all}
+.status{margin:15px 2px 0; font-size:14.5px; min-height:22px; color:var(--dim); word-break:keep-all}
 .status.ok{color:var(--ok)} .status.bad{color:var(--bad)}
 .status a{color:inherit}
 .sub{margin:10px 2px 0; font-size:13px; color:var(--dim)}
-.sub a,.linkbtn{color:var(--dim); text-decoration:underline; background:none; border:0; padding:0;
-  font:inherit; font-size:13px; cursor:pointer}
-footer{margin-top:26px; font-size:12.5px; color:var(--dim); line-height:1.8}
-footer a{color:var(--dim)}
+footer{margin-top:24px; font-size:12.5px; color:var(--dim); line-height:1.8}
 
 .dots::after{content:"…"; animation:d 1.3s ease-in-out infinite}
 @keyframes d{0%,100%{opacity:.25}50%{opacity:1}}
 
 label{display:block; font-size:13px; color:var(--dim); margin:0 0 8px}
-input[type=password],input[type=text]{
-  width:100%; padding:14px; font:15px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
-  background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:12px;
-}
+input[type=password]{width:100%; padding:14px; font:15px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+  background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:12px}
 ol{margin:12px 0 0; padding-left:20px; font-size:14px; color:var(--dim)}
 ol li{margin:7px 0; word-break:keep-all}
 ol b{color:var(--ink)}
@@ -115,13 +111,15 @@ code{font:13px ui-monospace,SFMono-Regular,Consolas,monospace; background:var(--
 const OWNER = 'reepower84-png', REPO = 'daily-book', WORKFLOW = 'send.yml', REF = 'main';
 const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
 const KEY = 'dailybook.token';
+const 자동 = '자동';
 
 const $ = s => document.querySelector(s);
 const view = $('#view'), gear = $('#gear');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const 책이름 = t => (t.includes('/') ? t.split('/').pop() : t);
 
-// 날짜는 전부 한국 시간 기준 — 서버(progress.json)와 같은 잣대여야 '오늘 보냈는지'가 맞는다
+// 날짜는 전부 한국 시간 기준 — 서버(progress.json)와 같은 잣대여야 '며칠 쉬었는지'가 맞는다
 const KST = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit'});
 const 오늘 = () => KST.format(new Date());
 const 요일 = ['일','월','화','수','목','금','토'];
@@ -142,7 +140,8 @@ const 며칠전 = ymd => Math.round((new Date(오늘()) - new Date(ymd)) / 86400
 })();
 
 let token = localStorage.getItem(KEY) || '';
-let 상태 = null;   // { next, progress }
+let 예고 = null;          // data/next.json — 앱이 읽는 유일한 파일
+let 고른분야 = 자동;
 
 class GhError extends Error {
   constructor(msg, 토큰문제 = false) { super(msg); this.토큰문제 = 토큰문제; }
@@ -173,7 +172,7 @@ async function gh(path, opts = {}) {
 const 읽기 = async path =>
   JSON.parse(await (await gh(`/contents/${path}?ref=${REF}`, {headers:{'Accept':'application/vnd.github.raw'}})).text());
 
-// ── 화면 ────────────────────────────────────────────────
+// ── 토큰 설정 화면 ──────────────────────────────────────
 function 토큰화면(안내 = '') {
   gear.hidden = true;
   view.innerHTML = `
@@ -185,12 +184,8 @@ function 토큰화면(안내 = '') {
       <p class="status" id="st"></p>
       <button class="go" id="save" style="margin-top:12px">저장하고 시작</button>
       <ol>
-        <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">토큰 발급 페이지</a>를 엽니다 (아래 링크)</li>
         <li>Repository access → <b>Only select repositories</b> → <code>daily-book</code></li>
-        <li>Permissions → Repository permissions에서<br>
-            <b>Actions</b> = Read and write, <b>Contents</b> = Read-only</li>
-        <li>Expiration은 <b>No expiration</b> 또는 1년을 권합니다</li>
-        <li>만들어진 <code>github_pat_…</code> 를 위에 붙여넣기</li>
+        <li>Permissions → <b>Actions</b> = Read and write, <b>Contents</b> = Read-only</li>
       </ol>
       <p class="sub" style="margin-top:16px">
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">→ 토큰 발급하러 가기</a>
@@ -204,7 +199,7 @@ function 토큰화면(안내 = '') {
     btn.disabled = true; st.className = 'status'; st.innerHTML = '확인하는 중<span class="dots"></span>';
     token = v;
     try {
-      await 읽기('data/progress.json');
+      await 읽기('data/next.json');
       localStorage.setItem(KEY, token);
       본화면();
     } catch (e) {
@@ -215,57 +210,57 @@ function 토큰화면(안내 = '') {
   };
 }
 
-function 카드(next, progress) {
-  const 보냄 = progress.streak.lastDate === 오늘();
-  const 마지막 = progress.streak.lastDate;
+// ── 본 화면 ────────────────────────────────────────────
+const 분야 = () => (고른분야 === 자동 ? 예고.auto : 고른분야);
+
+function 그리기() {
+  const c = 분야(), n = 예고.categories[c];
+  const 마지막 = 예고.lastReadDate;
   const 쉰날 = 마지막 ? 며칠전(마지막) : null;
   const 쉼 = 마지막 === null ? '아직 시작 전'
-    : 쉰날 === 0 ? '오늘 읽음'
+    : 쉰날 === 0 ? `오늘 ${예고.오늘보냄}번 보냄`
     : 쉰날 === 1 ? '어제 읽음'
     : `${쉰날}일 쉬는 중`;
-  const 비율 = Math.round(next.shelf.번째 / next.shelf.전체 * 1000) / 10;
+  const 읽은날 = 마지막 === 오늘() ? 예고.day : 예고.day - 1;
 
-  return `
-    <div class="card">
-      <span class="badge ${esc(next.category)}">${esc(next.category)}</span>
-      <p class="author">${esc(next.author)}</p>
-      <h1 class="title"><a href="${esc(next.url)}" target="_blank" rel="noopener">${esc(next.title.split('/').pop())}</a></h1>
-      <p class="meta">
-        보내면 <b>${next.pages}쪽</b> · <b>${next.day}일째</b> · ${next.이어읽기 ? '이어읽기' : '새 글'}<br>
-        ${esc(next.category)} 서가 ${next.shelf.번째}/${next.shelf.전체}편
-      </p>
-      <div class="bar"><i style="width:${Math.max(비율, 0.6)}%"></i></div>
+  view.innerHTML = `
+    <div class="picker">
+      ${[자동, ...예고.순서].map(k => `
+        <button class="chip" data-k="${esc(k)}" aria-pressed="${k === 고른분야}"
+          ${k === 자동 ? '' : `style="--sel:var(--${esc(k)})"`}>${esc(k)}</button>`).join('')}
     </div>
-    <button class="go${보냄 ? ' quiet' : ''}" id="go">${보냄 ? '오늘은 이미 보냈습니다' : '오늘치 보내기'}</button>
+    <div class="card">
+      <span class="badge" style="background:var(--${esc(c)})">${esc(c)}</span>${고른분야 === 자동 ? '<span class="auto">순서상 다음</span>' : ''}
+      <p class="author">${esc(n.author)}</p>
+      <h1 class="title"><a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(책이름(n.title))}</a></h1>
+      <p class="meta">
+        <b>${예고.pages}쪽</b> · ${예고.sends + 1}회째 · ${n.이어읽기 ? '이어읽기' : '새 글'}<br>
+        ${esc(c)} 서가 ${n.번째}/${n.전체}편
+      </p>
+      <div class="bar"><i style="width:${Math.max(n.번째 / n.전체 * 100, 0.6)}%; background:var(--${esc(c)})"></i></div>
+    </div>
+    <button class="go" id="go" style="background:var(--${esc(c)})">${예고.pages}쪽 보내기</button>
     <p class="status" id="st"></p>
-    ${보냄 ? '<p class="sub"><button class="linkbtn" id="force">그래도 한 번 더 보내기</button></p>' : ''}
     <footer>
-      ${esc(쉼)} · 누적 ${progress.totals.days}일 · ${progress.totals.chars.toLocaleString()}자 · 연속 ${progress.streak.current}일<br>
-      ${마지막 ? `마지막으로 읽은 날 ${날짜(마지막)}` : `시작 예정일 ${날짜(progress.startedAt)}`}
+      ${esc(쉼)} · 누적 ${예고.sends}회 · ${읽은날}일 · ${예고.chars.toLocaleString()}자 · 연속 ${예고.streak.current}일<br>
+      ${마지막 ? `마지막으로 읽은 날 ${날짜(마지막)}` : `시작 예정일 ${날짜(예고.startedAt)}`}
     </footer>`;
+
+  view.querySelectorAll('.chip').forEach(b => { b.onclick = () => { 고른분야 = b.dataset.k; 그리기(); }; });
+  $('#go').onclick = 보내기;
 }
 
 async function 본화면() {
   gear.hidden = false;
   view.innerHTML = '<p class="skel">불러오는 중<span class="dots"></span></p>';
   try {
-    const [next, progress] = await Promise.all([읽기('data/next.json'), 읽기('data/progress.json')]);
-    상태 = { next, progress };
+    예고 = await 읽기('data/next.json');
     그리기();
   } catch (e) {
-    if (e.토큰문제) return 토큰화면(`${esc(e.message)}`);
+    if (e.토큰문제) return 토큰화면(esc(e.message));
     view.innerHTML = `<div class="card"><p class="status bad">${esc(e.message)}</p></div>
       <button class="go" onclick="location.reload()">다시 시도</button>`;
   }
-}
-
-function 그리기() {
-  const { next, progress } = 상태;
-  view.innerHTML = 카드(next, progress);
-  const 보냄 = progress.streak.lastDate === 오늘();
-  $('#go').onclick = () => 보냄 ? null : 보내기(false);
-  if (보냄) $('#go').disabled = true;
-  const f = $('#force'); if (f) f.onclick = () => 보내기(true);
 }
 
 function 알리기(msg, kind = '') {
@@ -275,28 +270,29 @@ function 알리기(msg, kind = '') {
 }
 
 // ── 발송 ────────────────────────────────────────────────
-async function 보내기(force) {
-  const go = $('#go'), f = $('#force');
-  go.disabled = true; if (f) f.disabled = true;
+async function 보내기() {
+  const go = $('#go');
+  const 이전 = 예고.sends;
+  go.disabled = true;
   go.textContent = '보내는 중…';
-  알리기('발송을 요청했습니다<span class="dots"></span>');
+  알리기(`${분야()} ${예고.pages}쪽을 요청했습니다<span class="dots"></span>`);
 
   const 시각 = Date.now();
   try {
     await gh(`/actions/workflows/${WORKFLOW}/dispatches`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ref: REF, inputs: force ? { force: 'true' } : {} }),
+      body: JSON.stringify({ ref: REF, inputs: { category: 고른분야 } }),
     });
   } catch (e) {
     go.disabled = false; go.textContent = '다시 보내기';
     return 알리기(esc(e.message), 'bad');
   }
-  await 지켜보기(시각, go);
+  await 지켜보기(시각, go, 이전);
 }
 
 /** 방금 띄운 실행을 찾아 끝날 때까지 지켜본다. 디스패치 직후엔 목록에 없을 수 있어 잠시 기다린다. */
-async function 지켜보기(시각, go) {
+async function 지켜보기(시각, go, 이전) {
   for (let i = 0; i < 75; i++) {                       // 4초 × 75 ≈ 5분
     await sleep(4000);
     let runs;
@@ -309,7 +305,7 @@ async function 지켜보기(시각, go) {
       알리기(run.status === 'queued' ? '차례를 기다리는 중<span class="dots"></span>' : '본문을 모으는 중<span class="dots"></span>');
       continue;
     }
-    if (run.conclusion === 'success') return 성공(go, run);
+    if (run.conclusion === 'success') return 성공(go, 이전);
     go.textContent = '다시 보내기'; go.disabled = false;
     return 알리기(`발송에 실패했습니다 — <a href="${esc(run.html_url)}" target="_blank" rel="noopener">기록 보기</a>`, 'bad');
   }
@@ -317,23 +313,24 @@ async function 지켜보기(시각, go) {
   알리기(`아직 끝나지 않았습니다. <a href="https://github.com/${OWNER}/${REPO}/actions" target="_blank" rel="noopener">GitHub에서 확인</a>`, 'bad');
 }
 
-async function 성공(go, run) {
+async function 성공(go, 이전) {
   go.textContent = '보냈습니다 ✓';
   알리기('메일함을 확인해 주세요.', 'ok');
-  // 진도 커밋이 반영될 때까지 잠깐 기다렸다가 화면을 새로 맞춘다
-  for (let i = 0; i < 6; i++) {
+  // 진도 커밋이 반영될 때까지 기다렸다가, 다음 몫으로 화면을 갈아끼운다
+  for (let i = 0; i < 8; i++) {
     await sleep(2500);
     try {
-      const progress = await 읽기('data/progress.json');
-      if (progress.streak.lastDate === 오늘()) {
-        상태.progress = progress;
-        try { 상태.next = await 읽기('data/next.json'); } catch {}
+      const 새것 = await 읽기('data/next.json');
+      if (새것.sends > 이전) {
+        예고 = 새것;
+        고른분야 = 자동;                                 // 다음 몫은 다시 순서대로
         그리기();
-        알리기('메일을 보냈습니다. 메일함을 확인해 주세요.', 'ok');
+        알리기('메일을 보냈습니다. 더 읽으려면 한 번 더 누르세요.', 'ok');
         return;
       }
     } catch {}
   }
+  알리기('메일은 나갔습니다. 새로고침하면 다음 몫이 보입니다.', 'ok');
 }
 
 gear.onclick = () => {
