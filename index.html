@@ -131,6 +131,16 @@ const 날짜 = ymd => {
 };
 const 며칠전 = ymd => Math.round((new Date(오늘()) - new Date(ymd)) / 86400000);
 
+// 설정 링크(#t=토큰)로 들어오면 그 자리에서 저장하고 주소를 지운다.
+// 폰에서 긴 토큰을 손으로 옮겨 적지 않게 하려는 장치다.
+// 해시는 서버로 전송되지 않으므로 Pages 로그에는 남지 않는다.
+(function 설정링크() {
+  const m = location.hash.match(/[#&]t=([^&]+)/);
+  if (!m) return;
+  try { localStorage.setItem(KEY, decodeURIComponent(m[1])); } catch {}
+  history.replaceState(null, '', location.pathname + location.search);
+})();
+
 let token = localStorage.getItem(KEY) || '';
 let 상태 = null;   // { next, progress }
 
