@@ -83,6 +83,32 @@ button.go:disabled{opacity:.5; cursor:default; transform:none}
 .sub{margin:10px 2px 0; font-size:13px; color:var(--dim)}
 footer{margin-top:24px; font-size:12.5px; color:var(--dim); line-height:1.8}
 
+/* 달력 — 읽은 날을 분야 색으로 칠한다. 하루에 두 분야를 읽으면 칸이 나뉜다 */
+.cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
+.cal-head h2{margin:0; font-size:17px; font-weight:700; letter-spacing:-.01em}
+.nav{background:none; border:1px solid var(--line); color:var(--dim); width:32px; height:32px;
+  border-radius:9px; cursor:pointer; font:inherit; font-size:15px; line-height:1}
+.nav:hover:not(:disabled){background:var(--bg)}
+.nav:disabled{opacity:.3; cursor:default}
+.grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px}
+.dow{text-align:center; font-size:11.5px; color:var(--dim); padding-bottom:4px}
+.dow.sun{color:var(--bad)}
+.day{aspect-ratio:1; border:1px solid transparent; border-radius:10px; display:grid; place-items:center;
+  font-size:13.5px; background:var(--bg); color:var(--dim); font:inherit; padding:0; cursor:default}
+.day.blank{background:none}
+.day.before,.day.future{opacity:.3}
+.day.read{color:#fdf8f0; font-weight:700; cursor:pointer}
+.day.today{border-color:var(--ink)}
+.day.picked{outline:2px solid var(--accent); outline-offset:1px}
+.legend{display:flex; gap:11px; justify-content:center; margin-top:14px;
+  font-size:12px; color:var(--dim); flex-wrap:wrap}
+.legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px}
+.pick{margin:14px 0 0; padding-top:13px; border-top:1px solid var(--line);
+  font-size:13.5px; color:var(--dim); word-break:keep-all}
+.pick b{color:var(--ink); font-weight:600}
+.pick .ln{margin-top:7px; line-height:1.55}
+.badge.sm{font-size:10.5px; padding:2px 7px; letter-spacing:.04em}
+
 .dots::after{content:"…"; animation:d 1.3s ease-in-out infinite}
 @keyframes d{0%,100%{opacity:.25}50%{opacity:1}}
 
@@ -144,11 +170,21 @@ function 설정링크() {
 // 이 페이지를 이미 열어 둔 탭에서 설정 링크를 다시 열면 주소의 '#뒤'만 바뀐다.
 // 브라우저는 그걸 같은 문서로 보고 새로고침을 하지 않아서, 위 함수가 다시 돌지 않는다 —
 // 토큰을 넣었는데도 토큰 화면이 그대로 떠 있는 것처럼 보인다. 그래서 직접 듣는다.
-addEventListener('hashchange', () => { if (설정링크()) location.reload(); });
+addEventListener('hashchange', () => {
+  if (설정링크()) return location.reload();
+  // 달력 링크(#calendar)도 마찬가지다. 앱을 열어 둔 채로 알림의 링크를 누르면
+  // 주소의 '#뒤'만 바뀌어 화면을 다시 그리지 않는다 — 그래서 여기서 직접 내려 준다.
+  달력이동함 = false;
+  달력으로();
+});
 
 let token = localStorage.getItem(KEY) || '';
-let 예고 = null;          // data/next.json — 앱이 읽는 유일한 파일
+let 예고 = null;          // data/next.json — 보내기 화면이 읽는다
+let 진도 = null;          // data/progress.json — 달력이 읽는다 (history 가 곧 읽은 날이다)
 let 고른분야 = 자동;
+let 보는달 = null;        // {년, 월} — 분야를 바꿔 다시 그려도 보던 달은 유지한다
+let 고른날 = null;        // 달력에서 누른 날 (한 번 더 누르면 닫힌다)
+let 달력이동함 = false;   // #calendar 로 들어왔을 때 한 번만 스크롤한다
 
 class GhError extends Error {
   constructor(msg, 토큰문제 = false) { super(msg); this.토큰문제 = 토큰문제; }
@@ -249,6 +285,7 @@ function 그리기() {
     </div>
     <button class="go" id="go" style="background:var(--${esc(c)})">${예고.pages}쪽 보내기</button>
     <p class="status" id="st"></p>
+    ${달력()}
     <footer>
       ${esc(쉼)} · 누적 ${예고.sends}회 · ${읽은날}일 · ${예고.chars.toLocaleString()}자 · 연속 ${예고.streak.current}일<br>
       ${마지막 ? `마지막으로 읽은 날 ${날짜(마지막)}` : `시작 예정일 ${날짜(예고.startedAt)}`}
@@ -256,6 +293,121 @@ function 그리기() {
 
   view.querySelectorAll('.chip').forEach(b => { b.onclick = () => { 고른분야 = b.dataset.k; 그리기(); }; });
   $('#go').onclick = 보내기;
+  달력연결();
+}
+
+// ── 달력 ───────────────────────────────────────────────
+// data/progress.json 의 history 를 그대로 쓴다. 따로 저장하는 게 없다 —
+// 읽은 날은 이미 발송이 남긴 기록이고, 앱이 그걸 다시 적으면 두 벌이 생긴다.
+const 두자리 = n => String(n).padStart(2, '0');
+const 날짜문자 = (y, m, d) => `${y}-${두자리(m)}-${두자리(d)}`;
+
+// 하루에 여러 번 보낼 수 있다 — 한 날짜에 기록이 여러 개 달린다.
+function 날짜별() {
+  const m = new Map();
+  for (const h of 진도?.history ?? []) {
+    if (!m.has(h.date)) m.set(h.date, []);
+    m.get(h.date).push(h);
+  }
+  return m;
+}
+
+// 달력의 왼쪽 끝. startedAt 이 첫 기록보다 뒤에 잡혀 있는 경우가 있어 더 이른 쪽을 쓴다 —
+// 그러지 않으면 실제로 읽은 날이 '시작 전'으로 흐려진다.
+function 처음날() {
+  const 날들 = (진도?.history ?? []).map(h => h.date);
+  const s = 진도?.startedAt ?? 예고.startedAt ?? 오늘();
+  return 날들.length ? [s, ...날들].sort()[0] : s;
+}
+
+// 한 분야면 단색, 둘이면 대각선으로 반씩.
+// 셋 이상은 칸을 n등분하면 안 된다 — 가운데 줄이 날짜 숫자에 가려 그 색만 없는 것처럼 보인다.
+// 좁은 줄무늬를 반복해서, 어느 색도 숫자 뒤에만 있지 않게 한다.
+const 칸색 = 분야들 => {
+  const cs = [...new Set(분야들)];
+  const 색 = c => `var(--${esc(c)}, var(--accent))`;
+  if (cs.length === 1) return `background:${색(cs[0])}`;
+  if (cs.length === 2) return `background:linear-gradient(135deg,${색(cs[0])} 0 50%,${색(cs[1])} 50% 100%)`;
+  const 폭 = 7;
+  const 조각 = cs.map((c, i) => `${색(c)} ${i * 폭}px ${(i + 1) * 폭}px`).join(',');
+  return `background:repeating-linear-gradient(135deg,${조각})`;
+};
+
+function 달력() {
+  if (!진도) return '';                                  // 진도를 못 읽었으면 달력만 빠진다
+  const t = 오늘(), 시작 = 처음날(), 기록 = 날짜별();
+  const { 년, 월 } = 보는달;
+  const 빈칸 = new Date(Date.UTC(년, 월 - 1, 1)).getUTCDay();
+  const 끝 = new Date(Date.UTC(년, 월, 0)).getUTCDate();
+  const 이달 = 날짜문자(년, 월, 1).slice(0, 7);
+
+  const 칸 = [];
+  for (let i = 0; i < 빈칸; i++) 칸.push('<div class="day blank"></div>');
+  let 읽은수 = 0;
+  for (let d = 1; d <= 끝; d++) {
+    const ymd = 날짜문자(년, 월, d);
+    const hs = 기록.get(ymd);
+    if (hs) 읽은수++;
+    const 부류 = hs ? 'read' : ymd < 시작 ? 'before' : ymd > t ? 'future' : '';
+    const 쪽 = hs ? hs.reduce((a, h) => a + (h.pages ?? 0), 0) : 0;
+    const 귀띔 = hs ? `${ymd} · ${[...new Set(hs.map(h => h.category))].join('·')} ${쪽}쪽` : ymd;
+    칸.push(`<button class="day ${부류}${ymd === t ? ' today' : ''}${ymd === 고른날 ? ' picked' : ''}"
+      data-d="${ymd}"${hs ? ` style="${칸색(hs.map(h => h.category))}"` : ' disabled'}
+      title="${esc(귀띔)}">${d}</button>`);
+  }
+
+  return `
+    <div class="card" id="cal">
+      <div class="cal-head">
+        <button class="nav" id="prev" ${이달 > 시작.slice(0, 7) ? '' : 'disabled'}>‹</button>
+        <h2>${년}년 ${월}월</h2>
+        <button class="nav" id="next" ${이달 < t.slice(0, 7) ? '' : 'disabled'}>›</button>
+      </div>
+      <div class="grid">
+        ${요일.map((r, i) => `<div class="dow${i === 0 ? ' sun' : ''}">${r}</div>`).join('')}
+        ${칸.join('')}
+      </div>
+      <p class="legend">
+        ${예고.순서.map(c => `<span><i style="background:var(--${esc(c)},var(--accent))"></i>${esc(c)}</span>`).join('')}
+        <span>이 달 ${읽은수}일</span>
+      </p>
+      ${고른날줄(기록)}
+    </div>`;
+}
+
+function 고른날줄(기록) {
+  const hs = 고른날 ? 기록.get(고른날) : null;
+  if (!hs) return '<p class="sub" style="text-align:center">칠해진 날을 누르면 그날 읽은 글이 나옵니다</p>';
+  const 줄 = hs.map(h => `
+    <div class="ln">
+      <span class="badge sm" style="background:var(--${esc(h.category)},var(--accent))">${esc(h.category)}</span>
+      <b>${esc(책이름(h.title))}</b> · ${h.pages ?? 0}쪽 · ${(h.chars ?? 0).toLocaleString()}자
+    </div>`).join('');
+  return `<div class="pick"><b>${날짜(고른날)}</b> · ${hs.length}회${줄}</div>`;
+}
+
+const 달옮기기 = n => {
+  const d = new Date(Date.UTC(보는달.년, 보는달.월 - 1 + n, 1));
+  보는달 = { 년: d.getUTCFullYear(), 월: d.getUTCMonth() + 1 };
+  그리기();
+};
+
+function 달력연결() {
+  const 앞 = $('#prev'), 뒤 = $('#next');
+  if (앞) 앞.onclick = () => 달옮기기(-1);
+  if (뒤) 뒤.onclick = () => 달옮기기(1);
+  view.querySelectorAll('.day.read').forEach(b => {
+    b.onclick = () => { 고른날 = 고른날 === b.dataset.d ? null : b.dataset.d; 그리기(); };
+  });
+}
+
+// 디스코드 알림의 달력 링크(#calendar)로 들어오면 그 자리까지 내려 준다.
+function 달력으로() {
+  if (달력이동함 || location.hash !== '#calendar') return;
+  const el = $('#cal');
+  if (!el) return;
+  달력이동함 = true;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function 본화면() {
@@ -263,7 +415,11 @@ async function 본화면() {
   view.innerHTML = '<p class="skel">불러오는 중<span class="dots"></span></p>';
   try {
     예고 = await 읽기('data/next.json');
+    // 달력은 곁다리다 — 진도를 못 읽어도 보내기 화면은 떠야 한다
+    진도 = await 읽기('data/progress.json').catch(() => null);
+    보는달 ??= { 년: +오늘().slice(0, 4), 월: +오늘().slice(5, 7) };
     그리기();
+    달력으로();
   } catch (e) {
     if (e.토큰문제) return 토큰화면(esc(e.message));
     view.innerHTML = `<div class="card"><p class="status bad">${esc(e.message)}</p></div>
@@ -346,7 +502,9 @@ async function 성공(go, 이전) {
       const 새것 = await 읽기('data/next.json');
       if (새것.sends > 이전) {
         예고 = 새것;
+        진도 = await 읽기('data/progress.json').catch(() => 진도);  // 오늘 칸이 바로 칠해지게
         고른분야 = 자동;                                 // 다음 몫은 다시 순서대로
+        보는달 = { 년: +오늘().slice(0, 4), 월: +오늘().slice(5, 7) };
         그리기();
         알리기('메일을 보냈습니다. 더 읽으려면 한 번 더 누르세요.', 'ok');
         return;
